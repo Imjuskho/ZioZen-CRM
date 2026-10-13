@@ -12,6 +12,10 @@ import { CustomerNotesModule } from './customer-notes/customer-notes.module.js';
 import { ReportsModule } from './reports/reports.module.js';
 import { FilesModule } from './files/files.module.js';
 import { DocumentsModule } from './documents/documents.module.js';
+import { CustomFieldsModule } from './custom-fields/custom-fields.module.js';
+import { TicketsModule } from './tickets/tickets.module.js';
+import { TaskCommentsModule } from './task-comments/task-comments.module.js';
+import { PaymentsModule } from './payments/payments.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { DepartmentsModule } from './departments/departments.module.js';
 import { CustomersModule } from './customers/customers.module.js';
@@ -34,6 +38,10 @@ import { TasksModule } from './tasks/tasks.module.js';
     ReportsModule,
     FilesModule,
     DocumentsModule,
+    PaymentsModule,
+    TaskCommentsModule,
+    TicketsModule,
+    CustomFieldsModule,
   ],
   controllers: [AppController],
   providers: [AppService, { provide: APP_GUARD, useClass: RolesGuard }],
