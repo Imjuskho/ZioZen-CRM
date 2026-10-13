@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -23,6 +23,7 @@ model User {
   role           Role              @default(MEMBER)
   active         Boolean           @default(true)
   memberships    UserDepartment[]
+  auditLogs      AuditLog[]
   ownedProjects  Project[]         @relation("ProjectOwner")
   assignedTasks  Task[]            @relation("TaskAssignee")
   customers      Customer[]        @relation("CustomerOwner")
@@ -39,6 +40,7 @@ model Department {
   memberships  UserDepartment[]
   projects     Project[]
   tasks        Task[]
+  invoices     Invoice[]
   customers    Customer[]
   createdAt    DateTime          @default(now())
   updatedAt    DateTime          @updatedAt
@@ -67,6 +69,7 @@ model Customer {
   owner          User?        @relation("CustomerOwner", fields: [ownerId], references: [id], onDelete: SetNull)
   projects       Project[]
   tasks          Task[]
+  invoices       Invoice[]
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
@@ -91,6 +94,45 @@ model Project {
 
   @@index([departmentId])
   @@index([ownerId])
+}
+
+
+model AuditLog {
+  id             String       @id @default(cuid())
+  action         String
+  entityType     String
+  entityId       String?
+  departmentId   String?
+  metadata       Json?
+  actorId        String?
+  actor          User?        @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  createdAt      DateTime     @default(now())
+
+  @@index([departmentId])
+  @@index([entityType])
+  @@index([actorId])
+}
+
+
+model Invoice {
+  id             String       @id @default(cuid())
+  number         String       @unique
+  amount         Decimal      @db.Decimal(12, 2)
+  currency       String       @default("USD")
+  status         String       @default("draft")
+  departmentId   String
+  department     Department   @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  customerId     String?
+  customer       Customer?    @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  ownerId        String?
+  notes          String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([departmentId])
+  @@index([customerId])
+  @@index([ownerId])
+  @@index([status])
 }
 
 model Task {

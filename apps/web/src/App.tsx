@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import './App.css';
 import { api, getToken, setToken } from './api';
-import type { Department, Project, Task } from './types';
+import type { Department, Project, Task, Invoice } from './types';
 
 type AuthState = { token: string | null; email: string | null };
 
@@ -10,23 +10,28 @@ export default function App() {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [newProject, setNewProject] = useState({ name: '', departmentId: '' });
   const [newTask, setNewTask] = useState({ title: '', departmentId: '', projectId: '' });
+  const [newInvoice, setNewInvoice] = useState({ number: '', amount: '', departmentId: '' });
 
   async function load() {
     try {
       setError(null);
-      const [d, p, t] = await Promise.all([
+      const [d, p, t, i] = await Promise.all([
         api<Department[]>('/departments'),
         api<Project[]>('/projects'),
         api<Task[]>('/tasks'),
+        api<Invoice[]>('/invoices'),
       ]);
       setDepartments(d);
       setProjects(p);
       setTasks(t);
+      setInvoices(i);
       if (d[0] && !newProject.departmentId) setNewProject((s) => ({ ...s, departmentId: d[0].id }));
       if (d[0] && !newTask.departmentId) setNewTask((s) => ({ ...s, departmentId: d[0].id }));
+      if (d[0] && !newInvoice.departmentId) setNewInvoice((s) => ({ ...s, departmentId: d[0].id }));
     } catch (e) {
       setError((e as Error).message);
     }
@@ -53,6 +58,7 @@ export default function App() {
     setDepartments([]);
     setProjects([]);
     setTasks([]);
+    setInvoices([]);
   }
 
   async function createProject(event: React.FormEvent) {
@@ -76,6 +82,20 @@ export default function App() {
     await load();
   }
 
+  async function createInvoice(event: React.FormEvent) {
+    event.preventDefault();
+    await api('/invoices', {
+      method: 'POST',
+      json: {
+        number: newInvoice.number,
+        amount: newInvoice.amount,
+        departmentId: newInvoice.departmentId,
+      },
+    });
+    setNewInvoice((s) => ({ ...s, number: '', amount: '' }));
+    await load();
+  }
+
   if (!auth.token) {
     return <Login onLogin={login} />;
   }
@@ -92,10 +112,10 @@ export default function App() {
 
       <main>
         <section className="panel">
-          <h2>Your department scope</h2>
+          <h2>Department scope</h2>
           <p>
-            The API filters projects and tasks by department membership. Admins see every
-            department; other users only see assigned departments.
+            The API filters projects, tasks, and invoices by department membership. Admins see
+            every department; everyone else sees only assigned departments.
           </p>
           <ul>
             {departments.map((department) => (
@@ -198,6 +218,56 @@ export default function App() {
               ))}
             </select>
             <button>Create task</button>
+          </form>
+        </section>
+
+        <section className="panel">
+          <h2>Invoices ({invoices.length})</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Number</th>
+                <th>Amount</th>
+                <th>Status</th>
+                <th>Department</th>
+              </tr>
+            </thead>
+            <tbody>
+              {invoices.map((invoice) => (
+                <tr key={invoice.id}>
+                  <td>{invoice.number}</td>
+                  <td>{invoice.amount}</td>
+                  <td>{invoice.status}</td>
+                  <td>{invoice.department?.name ?? invoice.departmentId}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <form onSubmit={createInvoice} className="row">
+            <input
+              value={newInvoice.number}
+              onChange={(e) => setNewInvoice((s) => ({ ...s, number: e.target.value }))}
+              placeholder="Invoice number"
+              required
+            />
+            <input
+              value={newInvoice.amount}
+              onChange={(e) => setNewInvoice((s) => ({ ...s, amount: e.target.value }))}
+              placeholder="Amount"
+              required
+            />
+            <select
+              value={newInvoice.departmentId}
+              onChange={(e) => setNewInvoice((s) => ({ ...s, departmentId: e.target.value }))}
+              required
+            >
+              {departments.map((department) => (
+                <option key={department.id} value={department.id}>
+                  {department.name}
+                </option>
+              ))}
+            </select>
+            <button>Create invoice</button>
           </form>
         </section>
 

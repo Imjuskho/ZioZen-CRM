@@ -3,6 +3,8 @@ import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 import { PrismaModule } from './prisma/prisma.module.js';
+import { AuditModule } from './audit/audit.module.js';
+import { InvoicesModule } from './invoices/invoices.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { DepartmentsModule } from './departments/departments.module.js';
 import { CustomersModule } from './customers/customers.module.js';
@@ -13,11 +15,13 @@ import { TasksModule } from './tasks/tasks.module.js';
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     PrismaModule,
+    AuditModule,
     AuthModule,
     DepartmentsModule,
     CustomersModule,
     ProjectsModule,
     TasksModule,
+    InvoicesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

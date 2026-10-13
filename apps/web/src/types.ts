@@ -26,3 +26,14 @@ export type Task = {
   project?: { id: string; name: string } | null;
   createdAt: string;
 };
+
+export type Invoice = {
+  id: string;
+  number: string;
+  amount: string;
+  status: string;
+  currency: string;
+  departmentId: string;
+  department?: Department;
+  createdAt: string;
+};
