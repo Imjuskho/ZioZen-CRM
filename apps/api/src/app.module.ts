@@ -7,6 +7,7 @@ import { PrismaModule } from './prisma/prisma.module.js';
 import { RolesGuard } from './common/roles.guard.js';
 import { AuditModule } from './audit/audit.module.js';
 import { InvoicesModule } from './invoices/invoices.module.js';
+import { UsersModule } from './users/users.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { DepartmentsModule } from './departments/departments.module.js';
 import { CustomersModule } from './customers/customers.module.js';
@@ -24,6 +25,7 @@ import { TasksModule } from './tasks/tasks.module.js';
     ProjectsModule,
     TasksModule,
     InvoicesModule,
+    UsersModule,
   ],
   controllers: [AppController],
   providers: [AppService, { provide: APP_GUARD, useClass: RolesGuard }],
