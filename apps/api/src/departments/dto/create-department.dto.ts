@@ -10,4 +10,13 @@ export class CreateDepartmentDto {
   @IsOptional()
   @IsString()
   description?: string;
+
+  @IsOptional()
+  branding?: {
+    logoUrl?: string;
+    primaryColor?: string;
+    emailSignature?: string;
+    headerText?: string;
+    footerText?: string;
+  };
 }
