@@ -1,4 +1,10 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { CreateInvoiceDto } from './dto/create-invoice.dto.js';
@@ -15,9 +21,31 @@ export class InvoicesService {
     const scope = await getUserScope(this.prisma, userId);
     return this.prisma.invoice.findMany({
       where: scope.isAdmin ? {} : { departmentId: { in: scope.departmentIds } },
-      include: { department: true, customer: true },
+      include: { department: true, customer: true, payments: true, items: true },
       orderBy: { createdAt: 'desc' },
     });
+  }
+
+  async findOne(userId: string, id: string) {
+    const scope = await getUserScope(this.prisma, userId);
+    const invoice = await this.prisma.invoice.findUnique({
+      where: { id },
+      include: { department: true, customer: true, payments: true, items: true },
+    });
+    if (!invoice) throw new NotFoundException('Invoice not found');
+    ensureDepartmentAccess(scope.isAdmin, scope.departmentIds, invoice.departmentId);
+
+    const paidTotal = invoice.payments.reduce(
+      (sum, p) => sum.add(p.amount),
+      new Prisma.Decimal(0),
+    );
+    const outstandingBalance = invoice.amount.minus(paidTotal);
+
+    return {
+      ...invoice,
+      paidTotal: paidTotal.toString(),
+      outstandingBalance: outstandingBalance.toString(),
+    };
   }
 
   async create(userId: string, dto: CreateInvoiceDto) {
@@ -35,11 +63,11 @@ export class InvoicesService {
         notes: dto.notes,
         ownerId: userId,
       },
-      include: { department: true, customer: true },
+      include: { department: true, customer: true, payments: true, items: true },
     });
 
     await this.audit.log({
-      action: 'invoice.created',
+      action: 'INVOICE_CREATED',
       entityType: 'Invoice',
       entityId: invoice.id,
       departmentId: invoice.departmentId,
