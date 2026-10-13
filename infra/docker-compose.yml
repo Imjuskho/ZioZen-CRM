@@ -1,0 +1,20 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ziozen
+      POSTGRES_PASSWORD: ziozen_dev_password
+      POSTGRES_DB: ziozen
+    ports:
+      - "5432:5432"
+    volumes:
+      - ziozen_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ziozen -d ziozen"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  ziozen_pg_data:

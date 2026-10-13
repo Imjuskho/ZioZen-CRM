@@ -1,0 +1,82 @@
+:root {
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #1f2937;
+  background: #f4f7fb;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: linear-gradient(145deg, #edf3ff 0%, #f8fafc 100%);
+}
+
+.shell,
+.login {
+  min-height: 100vh;
+  padding: 24px;
+}
+
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+h1 { margin: 0; }
+h2 { margin-top: 0; }
+
+main {
+  display: grid;
+  gap: 24px;
+}
+
+.panel {
+  background: white;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 15px 40px rgba(15, 23, 42, 0.06);
+}
+
+.row {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+
+input,
+select,
+button {
+  border-radius: 10px;
+  padding: 10px 12px;
+  border: 1px solid #cbd5e1;
+  font: inherit;
+}
+
+button {
+  background: #1d4ed8;
+  color: white;
+  border: none;
+  cursor: pointer;
+}
+
+button:hover { background: #1e40af; }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 10px 8px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.error {
+  color: #b91c1c;
+  font-weight: 600;
+}
