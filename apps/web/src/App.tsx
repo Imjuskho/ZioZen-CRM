@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import './App.css';
 import { api, getToken, setToken } from './api';
-import type { Department, Project, Task, Invoice, UserRecord } from './types';
+import type { Department, Project, Task, Invoice, UserRecord, ReportSummary, AuditEntry } from './types';
 
 type AuthState = { token: string | null; email: string | null };
 
@@ -12,6 +12,8 @@ export default function App() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [users, setUsers] = useState<UserRecord[]>([]);
+  const [reports, setReports] = useState<ReportSummary[]>([]);
+  const [auditEntries, setAuditEntries] = useState<AuditEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [newProject, setNewProject] = useState({ name: '', departmentId: '' });
   const [newTask, setNewTask] = useState({ title: '', departmentId: '', projectId: '' });
@@ -47,10 +49,21 @@ export default function App() {
     }
   }
 
+  async function loadAnalytics() {
+    try {
+      setReports(await api<ReportSummary[]>('/reports/department-summary'));
+      setAuditEntries(await api<AuditEntry[]>('/audit-logs?limit=25'));
+    } catch {
+      setReports([]);
+      setAuditEntries([]);
+    }
+  }
+
   useEffect(() => {
     if (auth.token) {
       void load();
       void loadUsers();
+      void loadAnalytics();
     }
   }, [auth.token]);
 
@@ -321,6 +334,111 @@ export default function App() {
           {users.length === 0 ? <p>Only administrators can manage users.</p> : null}
         </section>
 
+
+        <section className="panel">
+          <h2>Department reporting</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Department</th>
+                <th>Customers</th>
+                <th>Projects</th>
+                <th>Tasks</th>
+                <th>Invoices</th>
+                <th>Revenue</th>
+              </tr>
+            </thead>
+            <tbody>
+              {reports.map((report) => (
+                <tr key={report.department.id}>
+                  <td>{report.department.name}</td>
+                  <td>{report.customers}</td>
+                  <td>{report.projects}</td>
+                  <td>{report.tasks}</td>
+                  <td>{report.invoices}</td>
+                  <td>{report.invoiceAmount}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+
+        <section className="panel">
+          <h2>Recent audit activity</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>When</th>
+                <th>Action</th>
+                <th>Entity</th>
+                <th>Actor</th>
+              </tr>
+            </thead>
+            <tbody>
+              {auditEntries.map((entry) => (
+                <tr key={entry.id}>
+                  <td>{new Date(entry.createdAt).toLocaleString()}</td>
+                  <td>{entry.action}</td>
+                  <td>{entry.entityType}</td>
+                  <td>{entry.actor?.email ?? 'system'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+
+        <section className="panel">
+          <h2>Department reporting</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Department</th>
+                <th>Customers</th>
+                <th>Projects</th>
+                <th>Tasks</th>
+                <th>Invoices</th>
+                <th>Revenue</th>
+              </tr>
+            </thead>
+            <tbody>
+              {reports.map((report) => (
+                <tr key={report.department.id}>
+                  <td>{report.department.name}</td>
+                  <td>{report.customers}</td>
+                  <td>{report.projects}</td>
+                  <td>{report.tasks}</td>
+                  <td>{report.invoices}</td>
+                  <td>{report.invoiceAmount}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+
+        <section className="panel">
+          <h2>Recent audit activity</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>When</th>
+                <th>Action</th>
+                <th>Entity</th>
+                <th>Actor</th>
+              </tr>
+            </thead>
+            <tbody>
+              {auditEntries.map((entry) => (
+                <tr key={entry.id}>
+                  <td>{new Date(entry.createdAt).toLocaleString()}</td>
+                  <td>{entry.action}</td>
+                  <td>{entry.entityType}</td>
+                  <td>{entry.actor?.email ?? 'system'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+
         {error ? <p className="error">{error}</p> : null}
       </main>
     </div>
@@ -362,6 +480,7 @@ function Login({ onLogin }: { onLogin: (email: string, password: string) => Prom
           required
         />
         <button>Sign in</button>
+
         {error ? <p className="error">{error}</p> : null}
       </form>
     </div>

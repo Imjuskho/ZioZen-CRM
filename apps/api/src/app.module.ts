@@ -11,6 +11,7 @@ import { UsersModule } from './users/users.module.js';
 import { CustomerNotesModule } from './customer-notes/customer-notes.module.js';
 import { ReportsModule } from './reports/reports.module.js';
 import { FilesModule } from './files/files.module.js';
+import { DocumentsModule } from './documents/documents.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { DepartmentsModule } from './departments/departments.module.js';
 import { CustomersModule } from './customers/customers.module.js';
@@ -32,6 +33,7 @@ import { TasksModule } from './tasks/tasks.module.js';
     CustomerNotesModule,
     ReportsModule,
     FilesModule,
+    DocumentsModule,
   ],
   controllers: [AppController],
   providers: [AppService, { provide: APP_GUARD, useClass: RolesGuard }],

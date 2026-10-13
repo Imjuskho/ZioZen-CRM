@@ -47,3 +47,22 @@ export type UserRecord = {
   active: boolean;
   memberships: { department: { name: string } }[];
 };
+
+export type ReportSummary = {
+  department: { id: string; name: string; slug: string };
+  projects: number;
+  tasks: number;
+  customers: number;
+  invoices: number;
+  invoiceAmount: string;
+};
+
+export type AuditEntry = {
+  id: string;
+  action: string;
+  entityType: string;
+  entityId?: string | null;
+  departmentId?: string | null;
+  createdAt: string;
+  actor?: { email: string } | null;
+};
