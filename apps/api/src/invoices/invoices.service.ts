@@ -77,4 +77,11 @@ export class InvoicesService {
 
     return invoice;
   }
+
+  async getHtml(userId: string, id: string) {
+    const { InvoicePdfService } = await import('./invoice-pdf.service.js');
+    const pdfService = new InvoicePdfService(this.prisma, this);
+    const html = await pdfService.generateHtml(userId, id);
+    return { html };
+  }
 }

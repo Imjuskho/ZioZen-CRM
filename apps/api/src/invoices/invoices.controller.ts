@@ -26,6 +26,14 @@ export class InvoicesController {
     return this.invoicesService.findOne(req.user.userId, id);
   }
 
+  @Get(':id/html')
+  async previewHtml(
+    @Request() req: { user: { userId: string } },
+    @Param('id') id: string,
+  ) {
+    return this.invoicesService.getHtml(req.user.userId, id);
+  }
+
   @Post()
   create(@Request() req: { user: { userId: string } }, @Body() dto: CreateInvoiceDto) {
     return this.invoicesService.create(req.user.userId, dto);

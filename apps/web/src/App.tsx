@@ -219,6 +219,19 @@ export default function App() {
     }
   }
 
+  async function previewInvoiceHtml(invoiceId: string) {
+    try {
+      const res = await api<{ html: string }>(`/invoices/${invoiceId}/html`);
+      const win = window.open('', '_blank');
+      if (win) {
+        win.document.write(res.html);
+        win.document.close();
+      }
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+
   async function createLead(event: React.FormEvent) {
     event.preventDefault();
     await api('/leads', {
@@ -569,11 +582,14 @@ export default function App() {
                   `$${i.amount}`,
                   i.status,
                   i.department?.name ?? i.departmentId,
-                  i.status !== 'paid' ? (
-                    <button className="primary-sm" onClick={() => recordPayment(i.id, i.amount)}>Record Payment</button>
-                  ) : (
-                    <span className="badge">Settled</span>
-                  ),
+                  <div className="btn-group" key={i.id}>
+                    <button className="secondary-sm" onClick={() => previewInvoiceHtml(i.id)}>Preview</button>
+                    {i.status !== 'paid' ? (
+                      <button className="primary-sm" onClick={() => recordPayment(i.id, i.amount)}>Record Payment</button>
+                    ) : (
+                      <span className="badge">Settled</span>
+                    )}
+                  </div>,
                 ])}
               />
             </section>

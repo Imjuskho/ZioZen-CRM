@@ -187,5 +187,15 @@ describe('Financial Operations & Reconciliation (e2e)', () => {
     });
     expect(auditLogs).toHaveLength(2);
     expect(auditLogs[0].action).toBe('PAYMENT_RECORDED');
+
+    // 9. Verify department-branded invoice preview
+    const htmlRes = await request(app.getHttpServer())
+      .get(`/invoices/${invoiceId}/html`)
+      .set('Authorization', `Bearer ${token1}`)
+      .expect(200);
+
+    expect(htmlRes.body.html).toContain('INVOICE');
+    expect(htmlRes.body.html).toContain(`INV-FIN-${suffix}`);
+    expect(htmlRes.body.html).toContain('Balance Due:');
   });
 });
