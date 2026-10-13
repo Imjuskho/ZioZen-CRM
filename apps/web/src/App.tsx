@@ -1,12 +1,22 @@
 import { useEffect, useState } from 'react';
 import './App.css';
 import { api, getToken, setToken } from './api';
-import type { Department, Project, Task, Invoice, UserRecord, ReportSummary, AuditEntry } from './types';
+import type {
+  AuditEntry,
+  Department,
+  Invoice,
+  Project,
+  ReportSummary,
+  Task,
+  UserRecord,
+} from './types';
 
 type AuthState = { token: string | null; email: string | null };
+type View = 'overview' | 'workspace' | 'admin' | 'system';
 
 export default function App() {
   const [auth, setAuth] = useState<AuthState>({ token: getToken(), email: localStorage.getItem('ziozen_email') });
+  const [view, setView] = useState<View>('overview');
   const [departments, setDepartments] = useState<Department[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -40,7 +50,6 @@ export default function App() {
     }
   }
 
-
   async function loadUsers() {
     try {
       setUsers(await api<UserRecord[]>('/users'));
@@ -52,7 +61,7 @@ export default function App() {
   async function loadAnalytics() {
     try {
       setReports(await api<ReportSummary[]>('/reports/department-summary'));
-      setAuditEntries(await api<AuditEntry[]>('/audit-logs?limit=25'));
+      setAuditEntries(await api<AuditEntry[]>('/audit-logs?limit=20'));
     } catch {
       setReports([]);
       setAuditEntries([]);
@@ -68,10 +77,7 @@ export default function App() {
   }, [auth.token]);
 
   async function login(email: string, password: string) {
-    const response = await api<{ accessToken: string }>('/auth/login', {
-      method: 'POST',
-      json: { email, password },
-    });
+    const response = await api<{ accessToken: string }>('/auth/login', { method: 'POST', json: { email, password } });
     setToken(response.accessToken);
     localStorage.setItem('ziozen_email', email);
     setAuth({ token: response.accessToken, email });
@@ -85,6 +91,9 @@ export default function App() {
     setProjects([]);
     setTasks([]);
     setInvoices([]);
+    setUsers([]);
+    setReports([]);
+    setAuditEntries([]);
   }
 
   async function createProject(event: React.FormEvent) {
@@ -98,13 +107,19 @@ export default function App() {
     event.preventDefault();
     await api('/tasks', {
       method: 'POST',
-      json: {
-        title: newTask.title,
-        departmentId: newTask.departmentId,
-        projectId: newTask.projectId || undefined,
-      },
+      json: { title: newTask.title, departmentId: newTask.departmentId, projectId: newTask.projectId || undefined },
     });
     setNewTask((s) => ({ ...s, title: '' }));
+    await load();
+  }
+
+  async function createInvoice(event: React.FormEvent) {
+    event.preventDefault();
+    await api('/invoices', {
+      method: 'POST',
+      json: { number: newInvoice.number, amount: newInvoice.amount, departmentId: newInvoice.departmentId },
+    });
+    setNewInvoice((s) => ({ ...s, number: '', amount: '' }));
     await load();
   }
 
@@ -113,334 +128,235 @@ export default function App() {
     await loadUsers();
   }
 
-  async function createInvoice(event: React.FormEvent) {
-    event.preventDefault();
-    await api('/invoices', {
-      method: 'POST',
-      json: {
-        number: newInvoice.number,
-        amount: newInvoice.amount,
-        departmentId: newInvoice.departmentId,
-      },
-    });
-    setNewInvoice((s) => ({ ...s, number: '', amount: '' }));
-    await load();
-  }
+  if (!auth.token) return <Login onLogin={login} />;
 
-  if (!auth.token) {
-    return <Login onLogin={login} />;
-  }
+  const totals = reports.reduce(
+    (acc, report) => {
+      acc.projects += report.projects;
+      acc.tasks += report.tasks;
+      acc.invoices += report.invoices;
+      acc.revenue += Number(report.invoiceAmount || 0);
+      return acc;
+    },
+    { projects: 0, tasks: 0, invoices: 0, revenue: 0 },
+  );
 
   return (
-    <div className="shell">
-      <header>
-        <h1>ZioZen CRM</h1>
-        <div>
-          <span>{auth.email}</span>
-          <button onClick={logout}>Logout</button>
+    <div className="app-shell">
+      <aside className="sidebar">
+        <div className="brand">
+          <span className="brand-mark">Z</span>
+          <div>
+            <strong>ZioZen CRM</strong>
+            <small>Department-aware workspace</small>
+          </div>
         </div>
-      </header>
-
-      <main>
-        <section className="panel">
-          <h2>Department scope</h2>
-          <p>
-            The API filters projects, tasks, and invoices by department membership. Admins see
-            every department; everyone else sees only assigned departments.
-          </p>
-          <ul>
-            {departments.map((department) => (
-              <li key={department.id}>{department.name}</li>
-            ))}
-          </ul>
-        </section>
-
-        <section className="panel">
-          <h2>Projects ({projects.length})</h2>
-          <table>
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Status</th>
-                <th>Department</th>
-              </tr>
-            </thead>
-            <tbody>
-              {projects.map((project) => (
-                <tr key={project.id}>
-                  <td>{project.name}</td>
-                  <td>{project.status}</td>
-                  <td>{project.department?.name ?? project.departmentId}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <form onSubmit={createProject} className="row">
-            <input
-              value={newProject.name}
-              onChange={(e) => setNewProject((s) => ({ ...s, name: e.target.value }))}
-              placeholder="New project name"
-              required
-            />
-            <select
-              value={newProject.departmentId}
-              onChange={(e) => setNewProject((s) => ({ ...s, departmentId: e.target.value }))}
-              required
+        <nav className="nav">
+          {[
+            ['overview', 'Overview'],
+            ['workspace', 'Workspace'],
+            ['admin', 'Administration'],
+            ['system', 'System'],
+          ].map(([id, label]) => (
+            <button
+              key={id}
+              className={view === id ? 'nav-item active' : 'nav-item'}
+              onClick={() => setView(id as View)}
             >
-              {departments.map((department) => (
-                <option key={department.id} value={department.id}>
-                  {department.name}
-                </option>
-              ))}
-            </select>
-            <button>Create project</button>
-          </form>
-        </section>
+              {label}
+            </button>
+          ))}
+        </nav>
+        <div className="sidebar-footer">
+          <span>{auth.email}</span>
+          <button className="logout" onClick={logout}>Sign out</button>
+        </div>
+      </aside>
 
-        <section className="panel">
-          <h2>Tasks ({tasks.length})</h2>
-          <table>
-            <thead>
-              <tr>
-                <th>Title</th>
-                <th>Status</th>
-                <th>Department</th>
-                <th>Project</th>
-              </tr>
-            </thead>
-            <tbody>
-              {tasks.map((task) => (
-                <tr key={task.id}>
-                  <td>{task.title}</td>
-                  <td>{task.status}</td>
-                  <td>{task.department?.name ?? task.departmentId}</td>
-                  <td>{task.project?.name ?? '-'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <form onSubmit={createTask} className="row">
-            <input
-              value={newTask.title}
-              onChange={(e) => setNewTask((s) => ({ ...s, title: e.target.value }))}
-              placeholder="New task title"
-              required
-            />
-            <select
-              value={newTask.departmentId}
-              onChange={(e) => setNewTask((s) => ({ ...s, departmentId: e.target.value }))}
-              required
-            >
-              {departments.map((department) => (
-                <option key={department.id} value={department.id}>
-                  {department.name}
-                </option>
-              ))}
-            </select>
-            <select
-              value={newTask.projectId}
-              onChange={(e) => setNewTask((s) => ({ ...s, projectId: e.target.value }))}
-            >
-              <option value="">No project</option>
-              {projects.map((project) => (
-                <option key={project.id} value={project.id}>
-                  {project.name}
-                </option>
-              ))}
-            </select>
-            <button>Create task</button>
-          </form>
-        </section>
+      <main className="content">
+        <header className="topbar">
+          <div>
+            <p className="eyebrow">Enterprise CRM</p>
+            <h1>{view === 'overview' ? 'Dashboard' : view === 'workspace' ? 'Workspace' : view === 'admin' ? 'Administration' : 'System'}</h1>
+          </div>
+          <div className="topbar-stats">
+            <span>{departments.length} departments</span>
+            <span>{projects.length} projects</span>
+            <span>{invoices.length} invoices</span>
+          </div>
+        </header>
 
-        <section className="panel">
-          <h2>Invoices ({invoices.length})</h2>
-          <table>
-            <thead>
-              <tr>
-                <th>Number</th>
-                <th>Amount</th>
-                <th>Status</th>
-                <th>Department</th>
-              </tr>
-            </thead>
-            <tbody>
-              {invoices.map((invoice) => (
-                <tr key={invoice.id}>
-                  <td>{invoice.number}</td>
-                  <td>{invoice.amount}</td>
-                  <td>{invoice.status}</td>
-                  <td>{invoice.department?.name ?? invoice.departmentId}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <form onSubmit={createInvoice} className="row">
-            <input
-              value={newInvoice.number}
-              onChange={(e) => setNewInvoice((s) => ({ ...s, number: e.target.value }))}
-              placeholder="Invoice number"
-              required
-            />
-            <input
-              value={newInvoice.amount}
-              onChange={(e) => setNewInvoice((s) => ({ ...s, amount: e.target.value }))}
-              placeholder="Amount"
-              required
-            />
-            <select
-              value={newInvoice.departmentId}
-              onChange={(e) => setNewInvoice((s) => ({ ...s, departmentId: e.target.value }))}
-              required
-            >
-              {departments.map((department) => (
-                <option key={department.id} value={department.id}>
-                  {department.name}
-                </option>
-              ))}
-            </select>
-            <button>Create invoice</button>
-          </form>
-        </section>
+        {error ? <div className="banner error">{error}</div> : null}
 
+        {view === 'overview' && (
+          <>
+            <section className="stat-grid">
+              <StatCard label="Projects" value={totals.projects} />
+              <StatCard label="Tasks" value={totals.tasks} />
+              <StatCard label="Invoices" value={totals.invoices} />
+              <StatCard label="Revenue" value={totals.revenue.toFixed(2)} />
+            </section>
+            <section className="panel">
+              <div className="panel-header">
+                <h2>Department performance</h2>
+                <p>Live, scoped operating metrics</p>
+              </div>
+              <DataTable
+                columns={['Department', 'Customers', 'Projects', 'Tasks', 'Invoices', 'Revenue']}
+                rows={reports.map((r) => [
+                  r.department.name,
+                  r.customers,
+                  r.projects,
+                  r.tasks,
+                  r.invoices,
+                  r.invoiceAmount,
+                ])}
+              />
+            </section>
+            <section className="panel">
+              <div className="panel-header">
+                <h2>Recent audit activity</h2>
+                <p>Recent changes across your visible scope</p>
+              </div>
+              <DataTable
+                columns={['When', 'Action', 'Entity', 'Actor']}
+                rows={auditEntries.map((e) => [
+                  new Date(e.createdAt).toLocaleString(),
+                  e.action,
+                  e.entityType,
+                  e.actor?.email ?? 'system',
+                ])}
+              />
+            </section>
+          </>
+        )}
 
-        <section className="panel">
-          <h2>User administration</h2>
-          <table>
-            <thead>
-              <tr>
-                <th>Email</th>
-                <th>Name</th>
-                <th>Role</th>
-                <th>Departments</th>
-              </tr>
-            </thead>
-            <tbody>
-              {users.map((user) => (
-                <tr key={user.id}>
-                  <td>{user.email}</td>
-                  <td>{user.firstName} {user.lastName}</td>
-                  <td>
-                    <select value={user.role} onChange={(e) => updateUserRole(user.id, e.target.value as UserRecord['role'])}>
-                      {['ADMIN', 'MANAGER', 'MEMBER', 'VIEWER'].map((role) => (
-                        <option key={role} value={role}>{role}</option>
-                      ))}
-                    </select>
-                  </td>
-                  <td>{user.memberships.map((membership) => membership.department.name).join(', ')}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {users.length === 0 ? <p>Only administrators can manage users.</p> : null}
-        </section>
+        {view === 'workspace' && (
+          <>
+            <section className="workspace-grid">
+              <div className="panel">
+                <div className="panel-header"><h2>Projects</h2><p>Create and review active work</p></div>
+                <form onSubmit={createProject} className="form-row">
+                  <input value={newProject.name} onChange={(e) => setNewProject((s) => ({ ...s, name: e.target.value }))} placeholder="New project name" required />
+                  <select value={newProject.departmentId} onChange={(e) => setNewProject((s) => ({ ...s, departmentId: e.target.value }))} required>
+                    {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+                  </select>
+                  <button>Create</button>
+                </form>
+                <DataTable
+                  columns={['Name', 'Status', 'Department']}
+                  rows={projects.map((p) => [p.name, p.status, p.department?.name ?? p.departmentId])}
+                />
+              </div>
 
+              <div className="panel">
+                <div className="panel-header"><h2>Tasks</h2><p>Track assignments and progress</p></div>
+                <form onSubmit={createTask} className="form-row">
+                  <input value={newTask.title} onChange={(e) => setNewTask((s) => ({ ...s, title: e.target.value }))} placeholder="New task title" required />
+                  <select value={newTask.departmentId} onChange={(e) => setNewTask((s) => ({ ...s, departmentId: e.target.value }))} required>
+                    {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+                  </select>
+                  <select value={newTask.projectId} onChange={(e) => setNewTask((s) => ({ ...s, projectId: e.target.value }))}>
+                    <option value="">No project</option>
+                    {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  </select>
+                  <button>Create</button>
+                </form>
+                <DataTable
+                  columns={['Title', 'Status', 'Department', 'Project']}
+                  rows={tasks.map((t) => [t.title, t.status, t.department?.name ?? t.departmentId, t.project?.name ?? '-'])}
+                />
+              </div>
+            </section>
 
-        <section className="panel">
-          <h2>Department reporting</h2>
-          <table>
-            <thead>
-              <tr>
-                <th>Department</th>
-                <th>Customers</th>
-                <th>Projects</th>
-                <th>Tasks</th>
-                <th>Invoices</th>
-                <th>Revenue</th>
-              </tr>
-            </thead>
-            <tbody>
-              {reports.map((report) => (
-                <tr key={report.department.id}>
-                  <td>{report.department.name}</td>
-                  <td>{report.customers}</td>
-                  <td>{report.projects}</td>
-                  <td>{report.tasks}</td>
-                  <td>{report.invoices}</td>
-                  <td>{report.invoiceAmount}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </section>
+            <section className="panel">
+              <div className="panel-header"><h2>Invoices</h2><p>Department-scoped billing</p></div>
+              <form onSubmit={createInvoice} className="form-row">
+                <input value={newInvoice.number} onChange={(e) => setNewInvoice((s) => ({ ...s, number: e.target.value }))} placeholder="Invoice number" required />
+                <input value={newInvoice.amount} onChange={(e) => setNewInvoice((s) => ({ ...s, amount: e.target.value }))} placeholder="Amount" required />
+                <select value={newInvoice.departmentId} onChange={(e) => setNewInvoice((s) => ({ ...s, departmentId: e.target.value }))} required>
+                  {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+                </select>
+                <button>Create</button>
+              </form>
+              <DataTable
+                columns={['Number', 'Amount', 'Status', 'Department']}
+                rows={invoices.map((i) => [i.number, i.amount, i.status, i.department?.name ?? i.departmentId])}
+              />
+            </section>
+          </>
+        )}
 
-        <section className="panel">
-          <h2>Recent audit activity</h2>
-          <table>
-            <thead>
-              <tr>
-                <th>When</th>
-                <th>Action</th>
-                <th>Entity</th>
-                <th>Actor</th>
-              </tr>
-            </thead>
-            <tbody>
-              {auditEntries.map((entry) => (
-                <tr key={entry.id}>
-                  <td>{new Date(entry.createdAt).toLocaleString()}</td>
-                  <td>{entry.action}</td>
-                  <td>{entry.entityType}</td>
-                  <td>{entry.actor?.email ?? 'system'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </section>
+        {view === 'admin' && (
+          <>
+            <section className="panel">
+              <div className="panel-header"><h2>User administration</h2><p>Roles and department memberships</p></div>
+              <DataTable
+                columns={['Email', 'Name', 'Role', 'Departments']}
+                rows={users.map((u) => [
+                  u.email,
+                  `${u.firstName} ${u.lastName}`,
+                  <select value={u.role} onChange={(e) => updateUserRole(u.id, e.target.value as UserRecord['role'])}>
+                    {['ADMIN', 'MANAGER', 'MEMBER', 'VIEWER'].map((role) => <option key={role} value={role}>{role}</option>)}
+                  </select>,
+                  u.memberships.map((m) => m.department.name).join(', ') || 'none',
+                ])}
+              />
+              {users.length === 0 ? <p className="muted">Only administrators can manage users.</p> : null}
+            </section>
 
-        <section className="panel">
-          <h2>Department reporting</h2>
-          <table>
-            <thead>
-              <tr>
-                <th>Department</th>
-                <th>Customers</th>
-                <th>Projects</th>
-                <th>Tasks</th>
-                <th>Invoices</th>
-                <th>Revenue</th>
-              </tr>
-            </thead>
-            <tbody>
-              {reports.map((report) => (
-                <tr key={report.department.id}>
-                  <td>{report.department.name}</td>
-                  <td>{report.customers}</td>
-                  <td>{report.projects}</td>
-                  <td>{report.tasks}</td>
-                  <td>{report.invoices}</td>
-                  <td>{report.invoiceAmount}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </section>
+            <section className="panel">
+              <div className="panel-header"><h2>Departments</h2><p>Visible organizational units</p></div>
+              <DataTable
+                columns={['Name', 'Slug', 'Description']}
+                rows={departments.map((d) => [d.name, d.slug, d.description ?? '-'])}
+              />
+            </section>
+          </>
+        )}
 
-        <section className="panel">
-          <h2>Recent audit activity</h2>
-          <table>
-            <thead>
-              <tr>
-                <th>When</th>
-                <th>Action</th>
-                <th>Entity</th>
-                <th>Actor</th>
-              </tr>
-            </thead>
-            <tbody>
-              {auditEntries.map((entry) => (
-                <tr key={entry.id}>
-                  <td>{new Date(entry.createdAt).toLocaleString()}</td>
-                  <td>{entry.action}</td>
-                  <td>{entry.entityType}</td>
-                  <td>{entry.actor?.email ?? 'system'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </section>
-
-        {error ? <p className="error">{error}</p> : null}
+        {view === 'system' && (
+          <section className="panel">
+            <div className="panel-header"><h2>System</h2><p>Architecture and deployment status</p></div>
+            <div className="system-grid">
+              <div><strong>API</strong><span>http://localhost:3000</span></div>
+              <div><strong>Web</strong><span>http://localhost:5173</span></div>
+              <div><strong>Database</strong><span>PostgreSQL</span></div>
+              <div><strong>Auth</strong><span>JWT + department scope</span></div>
+              <div><strong>Audit</strong><span>Enabled</span></div>
+              <div><strong>Storage</strong><span>Signed local files</span></div>
+            </div>
+          </section>
+        )}
       </main>
+    </div>
+  );
+}
+
+function StatCard({ label, value }: { label: string; value: string | number }) {
+  return (
+    <article className="stat-card">
+      <p>{label}</p>
+      <strong>{value}</strong>
+    </article>
+  );
+}
+
+function DataTable({ columns, rows }: { columns: string[]; rows: (string | number | React.ReactNode)[][] }) {
+  return (
+    <div className="table-wrap">
+      <table>
+        <thead>
+          <tr>{columns.map((column) => <th key={column}>{column}</th>)}</tr>
+        </thead>
+        <tbody>
+          {rows.length ? rows.map((row, rowIndex) => (
+            <tr key={rowIndex}>{row.map((cell, cellIndex) => <td key={cellIndex}>{cell}</td>)}</tr>
+          )) : (
+            <tr><td colSpan={columns.length} className="empty">No data in current scope</td></tr>
+          )}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -461,26 +377,14 @@ function Login({ onLogin }: { onLogin: (email: string, password: string) => Prom
   }
 
   return (
-    <div className="login">
-      <form onSubmit={submit} className="panel">
+    <div className="login-shell">
+      <form onSubmit={submit} className="login-card">
+        <span className="brand-mark">Z</span>
         <h1>ZioZen CRM</h1>
-        <p>Sign in to your department-scoped workspace.</p>
-        <input
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="Email"
-          type="email"
-          required
-        />
-        <input
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="Password"
-          type="password"
-          required
-        />
-        <button>Sign in</button>
-
+        <p>Sign in to your department-scoped enterprise workspace.</p>
+        <label>Email<input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required /></label>
+        <label>Password<input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required /></label>
+        <button className="primary">Sign in</button>
         {error ? <p className="error">{error}</p> : null}
       </form>
     </div>
