@@ -24,6 +24,7 @@ model User {
   active         Boolean           @default(true)
   memberships    UserDepartment[]
   auditLogs      AuditLog[]
+  customerNotes  CustomerNote[] @relation("AuthoredCustomerNotes")
   ownedProjects  Project[]         @relation("ProjectOwner")
   assignedTasks  Task[]            @relation("TaskAssignee")
   customers      Customer[]        @relation("CustomerOwner")
@@ -70,6 +71,7 @@ model Customer {
   projects       Project[]
   tasks          Task[]
   invoices       Invoice[]
+  customerNotes  CustomerNote[]
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
@@ -133,6 +135,20 @@ model Invoice {
   @@index([customerId])
   @@index([ownerId])
   @@index([status])
+}
+
+
+model CustomerNote {
+  id          String    @id @default(cuid())
+  body        String
+  customerId  String
+  customer    Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  authorId    String?
+  author      User?     @relation(fields: [authorId], references: [id], onDelete: SetNull, name: "AuthoredCustomerNotes")
+  createdAt   DateTime  @default(now())
+
+  @@index([customerId])
+  @@index([authorId])
 }
 
 model Task {

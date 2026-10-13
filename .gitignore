@@ -9,3 +9,4 @@ build/
 coverage/
 .DS_Store
 prisma/migrations/*/*.sql.bak
+storage/

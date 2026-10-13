@@ -37,3 +37,13 @@ export type Invoice = {
   department?: Department;
   createdAt: string;
 };
+
+export type UserRecord = {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  role: 'ADMIN' | 'MANAGER' | 'MEMBER' | 'VIEWER';
+  active: boolean;
+  memberships: { department: { name: string } }[];
+};

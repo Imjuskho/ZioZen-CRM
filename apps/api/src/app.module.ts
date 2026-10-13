@@ -8,6 +8,9 @@ import { RolesGuard } from './common/roles.guard.js';
 import { AuditModule } from './audit/audit.module.js';
 import { InvoicesModule } from './invoices/invoices.module.js';
 import { UsersModule } from './users/users.module.js';
+import { CustomerNotesModule } from './customer-notes/customer-notes.module.js';
+import { ReportsModule } from './reports/reports.module.js';
+import { FilesModule } from './files/files.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { DepartmentsModule } from './departments/departments.module.js';
 import { CustomersModule } from './customers/customers.module.js';
@@ -26,6 +29,9 @@ import { TasksModule } from './tasks/tasks.module.js';
     TasksModule,
     InvoicesModule,
     UsersModule,
+    CustomerNotesModule,
+    ReportsModule,
+    FilesModule,
   ],
   controllers: [AppController],
   providers: [AppService, { provide: APP_GUARD, useClass: RolesGuard }],

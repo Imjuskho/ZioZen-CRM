@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import './App.css';
 import { api, getToken, setToken } from './api';
-import type { Department, Project, Task, Invoice } from './types';
+import type { Department, Project, Task, Invoice, UserRecord } from './types';
 
 type AuthState = { token: string | null; email: string | null };
 
@@ -11,6 +11,7 @@ export default function App() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [users, setUsers] = useState<UserRecord[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [newProject, setNewProject] = useState({ name: '', departmentId: '' });
   const [newTask, setNewTask] = useState({ title: '', departmentId: '', projectId: '' });
@@ -37,8 +38,20 @@ export default function App() {
     }
   }
 
+
+  async function loadUsers() {
+    try {
+      setUsers(await api<UserRecord[]>('/users'));
+    } catch {
+      setUsers([]);
+    }
+  }
+
   useEffect(() => {
-    if (auth.token) void load();
+    if (auth.token) {
+      void load();
+      void loadUsers();
+    }
   }, [auth.token]);
 
   async function login(email: string, password: string) {
@@ -80,6 +93,11 @@ export default function App() {
     });
     setNewTask((s) => ({ ...s, title: '' }));
     await load();
+  }
+
+  async function updateUserRole(userId: string, role: UserRecord['role']) {
+    await api(`/users/${userId}`, { method: 'PATCH', json: { role } });
+    await loadUsers();
   }
 
   async function createInvoice(event: React.FormEvent) {
@@ -269,6 +287,38 @@ export default function App() {
             </select>
             <button>Create invoice</button>
           </form>
+        </section>
+
+
+        <section className="panel">
+          <h2>User administration</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Email</th>
+                <th>Name</th>
+                <th>Role</th>
+                <th>Departments</th>
+              </tr>
+            </thead>
+            <tbody>
+              {users.map((user) => (
+                <tr key={user.id}>
+                  <td>{user.email}</td>
+                  <td>{user.firstName} {user.lastName}</td>
+                  <td>
+                    <select value={user.role} onChange={(e) => updateUserRole(user.id, e.target.value as UserRecord['role'])}>
+                      {['ADMIN', 'MANAGER', 'MEMBER', 'VIEWER'].map((role) => (
+                        <option key={role} value={role}>{role}</option>
+                      ))}
+                    </select>
+                  </td>
+                  <td>{user.memberships.map((membership) => membership.department.name).join(', ')}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {users.length === 0 ? <p>Only administrators can manage users.</p> : null}
         </section>
 
         {error ? <p className="error">{error}</p> : null}
