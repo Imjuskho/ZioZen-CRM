@@ -31,6 +31,8 @@ model User {
   ticketReplies    TicketReply[] @relation("AuthoredTicketReplies")
   expenses         Expense[] @relation("AuthoredExpenses")
   webhooks         Webhook[] @relation("AuthoredWebhooks")
+  knowledgeArticles KnowledgeArticle[] @relation("AuthoredKnowledgeArticles")
+  calendarEvents    CalendarEvent[]
   ownedProjects  Project[]         @relation("ProjectOwner")
   assignedTasks  Task[]            @relation("TaskAssignee")
   customers      Customer[]        @relation("CustomerOwner")
@@ -52,6 +54,12 @@ model Department {
   tickets      Ticket[]
   expenses     Expense[]
   recurringInvoices RecurringInvoice[]
+  estimates    Estimate[]
+  proposals    Proposal[]
+  creditNotes  CreditNote[]
+  subscriptions Subscription[]
+  contracts    Contract[]
+  events       CalendarEvent[]
   createdAt    DateTime          @default(now())
   updatedAt    DateTime          @updatedAt
 }
@@ -82,6 +90,11 @@ model Customer {
   invoices       Invoice[]
   customerNotes  CustomerNote[]
   recurringInvoices RecurringInvoice[]
+  estimates    Estimate[]
+  proposals    Proposal[]
+  creditNotes  CreditNote[]
+  subscriptions Subscription[]
+  contracts    Contract[]
   tickets        Ticket[]
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
@@ -343,6 +356,153 @@ model Announcement {
   expiresAt   DateTime?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+}
+
+
+model Estimate {
+  id                String   @id @default(cuid())
+  number            String   @unique
+  status            String   @default("draft")
+  total             Decimal  @db.Decimal(12, 2)
+  currency          String   @default("USD")
+  validUntil        DateTime?
+  notes             String?
+  customerId        String?
+  customer          Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  departmentId      String
+  department        Department @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  ownerId           String?
+  convertedInvoiceId String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([departmentId])
+  @@index([status])
+  @@index([customerId])
+}
+
+model Proposal {
+  id                String   @id @default(cuid())
+  number            String   @unique
+  title             String
+  status            String   @default("draft")
+  total             Decimal  @db.Decimal(12, 2)
+  currency          String   @default("USD")
+  publicToken       String   @unique @default(cuid())
+  viewedAt          DateTime?
+  acceptedAt        DateTime?
+  notes             String?
+  content           String?
+  customerId        String?
+  customer          Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  departmentId      String
+  department        Department @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  ownerId           String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([departmentId])
+  @@index([status])
+  @@index([customerId])
+}
+
+model CreditNote {
+  id                String   @id @default(cuid())
+  number            String   @unique
+  status            String   @default("draft")
+  total             Decimal  @db.Decimal(12, 2)
+  currency          String   @default("USD")
+  notes             String?
+  customerId        String?
+  customer          Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  relatedInvoiceId  String?
+  departmentId      String
+  department        Department @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  ownerId           String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([departmentId])
+  @@index([status])
+  @@index([customerId])
+}
+
+model Subscription {
+  id                String   @id @default(cuid())
+  name              String
+  amount            Decimal  @db.Decimal(12, 2)
+  currency          String   @default("USD")
+  interval          String   @default("monthly")
+  status            String   @default("active")
+  startDate         DateTime @default(now())
+  nextBillingDate   DateTime
+  endDate           DateTime?
+  notes             String?
+  customerId        String?
+  customer          Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  departmentId      String
+  department        Department @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  ownerId           String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([departmentId])
+  @@index([status])
+  @@index([nextBillingDate])
+}
+
+model Contract {
+  id                String   @id @default(cuid())
+  subject           String
+  value             Decimal? @db.Decimal(12, 2)
+  status            String   @default("draft")
+  startDate         DateTime?
+  endDate           DateTime?
+  content           String?
+  customerId        String?
+  customer          Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  departmentId      String
+  department        Department @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  ownerId           String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([departmentId])
+  @@index([status])
+}
+
+model KnowledgeArticle {
+  id          String   @id @default(cuid())
+  title       String
+  slug        String   @unique
+  content     String
+  category    String?
+  published   Boolean  @default(false)
+  authorId    String?
+  author      User?    @relation("AuthoredKnowledgeArticles", fields: [authorId], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([category])
+  @@index([published])
+}
+
+model CalendarEvent {
+  id           String   @id @default(cuid())
+  title        String
+  description  String?
+  startsAt     DateTime
+  endsAt       DateTime?
+  reminderAt   DateTime?
+  ownerId      String
+  owner        User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([startsAt])
+  @@index([ownerId])
 }
 
 model Task {
