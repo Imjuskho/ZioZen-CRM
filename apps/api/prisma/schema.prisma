@@ -29,6 +29,8 @@ model User {
   requestedTickets Ticket[] @relation("RequestedTickets")
   assignedTickets  Ticket[] @relation("AssignedTickets")
   ticketReplies    TicketReply[] @relation("AuthoredTicketReplies")
+  expenses         Expense[] @relation("AuthoredExpenses")
+  webhooks         Webhook[] @relation("AuthoredWebhooks")
   ownedProjects  Project[]         @relation("ProjectOwner")
   assignedTasks  Task[]            @relation("TaskAssignee")
   customers      Customer[]        @relation("CustomerOwner")
@@ -48,6 +50,8 @@ model Department {
   invoices     Invoice[]
   customers    Customer[]
   tickets      Ticket[]
+  expenses     Expense[]
+  recurringInvoices RecurringInvoice[]
   createdAt    DateTime          @default(now())
   updatedAt    DateTime          @updatedAt
 }
@@ -77,6 +81,7 @@ model Customer {
   tasks          Task[]
   invoices       Invoice[]
   customerNotes  CustomerNote[]
+  recurringInvoices RecurringInvoice[]
   tickets        Ticket[]
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
@@ -97,6 +102,7 @@ model Project {
   ownerId        String?
   owner          User?        @relation("ProjectOwner", fields: [ownerId], references: [id], onDelete: SetNull)
   tasks          Task[]
+  milestones     TaskMilestone[]
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
@@ -254,6 +260,89 @@ model CustomFieldValue {
 
   @@unique([customFieldId, entityId])
   @@index([entityType, entityId])
+}
+
+
+model RecurringInvoice {
+  id             String   @id @default(cuid())
+  numberPrefix   String   @default("RI")
+  amount         Decimal  @db.Decimal(12, 2)
+  currency       String   @default("USD")
+  interval       String   @default("monthly")
+  status         String   @default("active")
+  nextRunAt      DateTime
+  customerId     String?
+  customer       Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  departmentId   String
+  department     Department @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  ownerId        String?
+  notes          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([departmentId])
+  @@index([status])
+  @@index([nextRunAt])
+}
+
+model Expense {
+  id            String   @id @default(cuid())
+  amount        Decimal  @db.Decimal(12, 2)
+  currency      String   @default("USD")
+  category      String
+  description   String?
+  expenseDate   DateTime @default(now())
+  vendor        String?
+  departmentId  String
+  department    Department @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  ownerId       String?
+  owner         User?    @relation("AuthoredExpenses", fields: [ownerId], references: [id], onDelete: SetNull)
+  receiptPath   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([departmentId])
+  @@index([category])
+  @@index([expenseDate])
+}
+
+model TaskMilestone {
+  id          String    @id @default(cuid())
+  projectId   String
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  dueDate     DateTime?
+  cost        Decimal?  @db.Decimal(12, 2)
+  completed   Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([projectId])
+  @@index([dueDate])
+}
+
+model Webhook {
+  id          String   @id @default(cuid())
+  name        String
+  url         String
+  events      String[]
+  secret      String?
+  active      Boolean  @default(true)
+  ownerId     String?
+  owner       User?    @relation("AuthoredWebhooks", fields: [ownerId], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Announcement {
+  id          String    @id @default(cuid())
+  title       String
+  message     String
+  active      Boolean   @default(true)
+  expiresAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 }
 
 model Task {
