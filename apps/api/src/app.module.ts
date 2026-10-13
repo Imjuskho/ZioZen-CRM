@@ -1,8 +1,10 @@
-import { Module } from '@nestjs/common';
+import { Module } from "@nestjs/common";
+import { APP_GUARD } from "@nestjs/core";
 import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 import { PrismaModule } from './prisma/prisma.module.js';
+import { RolesGuard } from './common/roles.guard.js';
 import { AuditModule } from './audit/audit.module.js';
 import { InvoicesModule } from './invoices/invoices.module.js';
 import { AuthModule } from './auth/auth.module.js';
@@ -24,6 +26,6 @@ import { TasksModule } from './tasks/tasks.module.js';
     InvoicesModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [AppService, { provide: APP_GUARD, useClass: RolesGuard }],
 })
 export class AppModule {}
