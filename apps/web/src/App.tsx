@@ -21,6 +21,14 @@ import type {
 } from './types';
 
 type AuthState = { token: string | null; email: string | null };
+type SessionRecord = { id: string; deviceLabel?: string | null; ipAddress?: string | null; userAgent?: string | null; lastSeenAt: string; expiresAt: string; revokedAt?: string | null; createdAt: string };
+type ComplianceReport = { events: number; byAction: Array<{ action: string; _count: { _all: number } }>; byEntity: Array<{ entityType: string; _count: { _all: number } }>; sessions: { active: number; revoked: number } };
+type SecurityAlert = { code: string; severity: 'high' | 'medium'; title: string; detail: string; count: number; threshold: number; windowHours: number; ipAddress?: string };
+type SecurityAlerts = { generatedAt: string; windowHours: number; thresholds: { revokedSessions: number; suspiciousEvents: number }; alerts: SecurityAlert[]; summary: { revokedSessions: number; suspiciousEvents: number; sensitiveIps: number } };
+type AutomationRuleRecord = { id: string; name: string; eventType: string; enabled: boolean; departmentId: string };
+type AutomationRunRecord = { id: string; status: string; attempts: number; error?: string | null; nextRetryAt?: string | null; deadLetteredAt?: string | null; createdAt: string; rule: { name: string; eventType: string; departmentId: string } };
+type PayrollBatchRecord = { id: string; name: string; status: string; periodStart: string; periodEnd: string; departmentId: string; lockedAt?: string | null; exportedAt?: string | null; exportReference?: string | null; payslips: Array<{ netAmount: string }> };
+type ExportJobRecord = { id: string; status: string; progress: number; recordCount: number; error?: string | null; createdAt: string; completedAt?: string | null; downloadReady: boolean };
 type View = 'overview' | 'workspace' | 'sales' | 'finance' | 'support' | 'admin' | 'system';
 
 export default function App() {
@@ -40,6 +48,13 @@ export default function App() {
   const [users, setUsers] = useState<UserRecord[]>([]);
   const [reports, setReports] = useState<ReportSummary[]>([]);
   const [auditEntries, setAuditEntries] = useState<AuditEntry[]>([]);
+  const [complianceReport, setComplianceReport] = useState<ComplianceReport | null>(null);
+  const [securityAlerts, setSecurityAlerts] = useState<SecurityAlerts | null>(null);
+  const [sessions, setSessions] = useState<SessionRecord[]>([]);
+  const [automationRules, setAutomationRules] = useState<AutomationRuleRecord[]>([]);
+  const [automationRuns, setAutomationRuns] = useState<AutomationRunRecord[]>([]);
+  const [payrollBatches, setPayrollBatches] = useState<PayrollBatchRecord[]>([]);
+  const [exportJobs, setExportJobs] = useState<ExportJobRecord[]>([]);
   const [customFields, setCustomFields] = useState<CustomField[]>([]);
   const [webhooks, setWebhooks] = useState<Webhook[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -111,7 +126,57 @@ export default function App() {
     } catch {
       setReports([]);
       setAuditEntries([]);
+    setComplianceReport(null);
+    setSecurityAlerts(null);
+    setSessions([]);
+    setAutomationRules([]);
+    setAutomationRuns([]);
+    setPayrollBatches([]);
     }
+  }
+
+  async function loadSecurity() {
+    try {
+      const [report, alerts, sessionList] = await Promise.all([
+        api<ComplianceReport>('/audit-logs/compliance-report'),
+        api<SecurityAlerts>('/audit-logs/alerts'),
+        api<SessionRecord[]>('/auth/sessions'),
+      ]);
+      setComplianceReport(report);
+      setSecurityAlerts(alerts);
+      setSessions(sessionList);
+    } catch {
+      setComplianceReport(null);
+      setSecurityAlerts(null);
+      setSessions([]);
+    setAutomationRules([]);
+    setAutomationRuns([]);
+    setPayrollBatches([]);
+    }
+  }
+
+  async function loadAutomation() {
+    try {
+      const [rules, runs] = await Promise.all([api<AutomationRuleRecord[]>('/automation/rules'), api<AutomationRunRecord[]>('/automation/runs')]);
+      setAutomationRules(rules);
+      setAutomationRuns(runs);
+    } catch {
+      setAutomationRules([]);
+      setAutomationRuns([]);
+    setPayrollBatches([]);
+    }
+  }
+
+  async function loadPayroll() {
+    try {
+      setPayrollBatches(await api<PayrollBatchRecord[]>('/people/payroll'));
+    } catch {
+      setPayrollBatches([]);
+    }
+  }
+
+  async function loadExportJobs() {
+    try { setExportJobs(await api<ExportJobRecord[]>('/exports/tenant/jobs')); } catch { setExportJobs([]); }
   }
 
   async function loadExtensibility() {
@@ -133,6 +198,10 @@ export default function App() {
       void load();
       void loadUsers();
       void loadAnalytics();
+      void loadSecurity();
+      void loadAutomation();
+      void loadPayroll();
+      void loadExportJobs();
       void loadExtensibility();
     }
   }, [auth.token]);
@@ -156,6 +225,13 @@ export default function App() {
     setUsers([]);
     setReports([]);
     setAuditEntries([]);
+    setComplianceReport(null);
+    setSecurityAlerts(null);
+    setSessions([]);
+    setAutomationRules([]);
+    setAutomationRuns([]);
+    setPayrollBatches([]);
+    setExportJobs([]);
   }
 
   async function createCustomer(event: React.FormEvent) {
@@ -347,6 +423,81 @@ export default function App() {
   async function updateUserRole(userId: string, role: UserRecord['role']) {
     await api(`/users/${userId}`, { method: 'PATCH', json: { role } });
     await loadUsers();
+  }
+
+  async function exportTenantPackage() {
+    try {
+      const created = await api<ExportJobRecord>('/exports/tenant/jobs?includeAudit=true', { method: 'POST' });
+      setExportJobs((jobs) => [created, ...jobs.filter((job) => job.id !== created.id)]);
+      let status = created;
+      for (let attempt = 0; attempt < 40 && !['completed', 'failed'].includes(status.status); attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 250));
+        status = await api<ExportJobRecord>(`/exports/tenant/jobs/${created.id}`);
+        setExportJobs((jobs) => jobs.map((job) => job.id === status.id ? status : job));
+      }
+      if (status.status === 'completed') {
+        const result = await api<Record<string, unknown>>(`/exports/tenant/jobs/${status.id}/download`);
+        const blob = new Blob([JSON.stringify(result, null, 2)], { type: 'application/json;charset=utf-8' });
+        const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = `tenant-export-${new Date().toISOString().slice(0, 10)}.json`; link.click(); URL.revokeObjectURL(url);
+      } else setError(status.error ?? 'Tenant export failed');
+      await loadExportJobs();
+    } catch (e) { setError((e as Error).message); }
+  }
+
+  async function validatePayrollBatch(batchId: string) {
+    try {
+      const validation = await api<{ ready: boolean; errors: string[] }>(`/people/payroll/${batchId}/validation`);
+      setError(validation.ready ? null : validation.errors.join('; '));
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+
+  async function approvePayrollBatch(batchId: string) {
+    try {
+      await api(`/people/payroll/${batchId}/approve`, { method: 'POST' });
+      await loadPayroll();
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+
+  async function exportPayrollBatch(batchId: string) {
+    try {
+      const result = await api<{ content: string; reference: string }>(`/people/payroll/${batchId}/export`, { method: 'POST' });
+      const blob = new Blob([result.content], { type: 'text/csv;charset=utf-8' });
+      const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = `${result.reference}.csv`; link.click(); URL.revokeObjectURL(url);
+      await loadPayroll();
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+
+  async function replayAutomationRun(runId: string) {
+    try {
+      await api(`/automation/runs/${runId}/replay`, { method: 'POST' });
+      await loadAutomation();
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+
+  async function revokeSession(sessionId: string) {
+    try {
+      await api(`/auth/sessions/${sessionId}`, { method: 'DELETE' });
+      await loadSecurity();
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+
+  async function revokeAllSessions() {
+    try {
+      await api('/auth/sessions/revoke-all', { method: 'POST' });
+      await loadSecurity();
+    } catch (e) {
+      setError((e as Error).message);
+    }
   }
 
   async function createCustomField(event: React.FormEvent) {
@@ -807,6 +958,20 @@ export default function App() {
               />
             </section>
 
+            <section className="panel">
+              <div className="panel-header"><div><h2>Session control</h2><p>Review active access and revoke compromised sessions immediately.</p></div><button className="secondary-button" onClick={revokeAllSessions}>Revoke all sessions</button></div>
+              <DataTable
+                columns={['Device', 'Network', 'Last seen', 'Status', 'Action']}
+                rows={sessions.map((session) => [
+                  session.deviceLabel || session.userAgent || 'Authenticated browser',
+                  session.ipAddress || 'IP unavailable',
+                  new Date(session.lastSeenAt).toLocaleString(),
+                  session.revokedAt ? <span className="badge badge-danger">Revoked</span> : <span className="badge">Active</span>,
+                  session.revokedAt ? '-' : <button className="secondary-sm" onClick={() => revokeSession(session.id)}>Revoke</button>,
+                ])}
+              />
+            </section>
+
             <section className="workspace-grid">
               <div className="panel">
                 <div className="panel-header"><h2>Custom Fields</h2><p>Schema extensibility & metadata</p></div>
@@ -858,21 +1023,46 @@ export default function App() {
                 />
               </div>
             </section>
+
+            <section className="panel">
+              <div className="panel-header"><div><h2>Payroll control</h2><p>Validate inputs, approve with segregation of duties, then export a locked operational batch.</p></div><span className="badge">{payrollBatches.filter((batch) => batch.status === 'exported').length} exported</span></div>
+              <DataTable
+                columns={['Batch', 'Period', 'Employees', 'Status', 'Actions']}
+                rows={payrollBatches.slice(0, 12).map((batch) => [
+                  batch.name,
+                  `${new Date(batch.periodStart).toLocaleDateString()} – ${new Date(batch.periodEnd).toLocaleDateString()}`,
+                  batch.payslips.length,
+                  batch.status,
+                  <div className="btn-group" key={batch.id}><button className="secondary-sm" onClick={() => validatePayrollBatch(batch.id)}>Validate</button>{batch.status === 'draft' ? <button className="primary-sm" onClick={() => approvePayrollBatch(batch.id)}>Approve</button> : null}{batch.status === 'approved' ? <button className="primary-sm" onClick={() => exportPayrollBatch(batch.id)}>Export CSV</button> : null}</div>,
+                ])}
+              />
+            </section>
+
+            <section className="panel">
+              <div className="panel-header"><div><h2>Automation reliability</h2><p>Observe rule execution, retry state, and dead-lettered work.</p></div><span className="badge">{automationRules.length} rules · {automationRuns.filter((run) => run.status === 'dead_lettered').length} dead-lettered</span></div>
+              <DataTable
+                columns={['Rule', 'Event', 'Status', 'Attempts', 'Next retry', 'Action']}
+                rows={automationRuns.slice(0, 20).map((run) => [
+                  run.rule.name,
+                  run.rule.eventType,
+                  run.status === 'dead_lettered' ? <span className="badge badge-danger">Dead-lettered</span> : run.status,
+                  run.attempts,
+                  run.nextRetryAt ? new Date(run.nextRetryAt).toLocaleString() : '-',
+                  ['failed', 'dead_lettered'].includes(run.status) ? <button className="secondary-sm" onClick={() => replayAutomationRun(run.id)}>Replay</button> : '-',
+                ])}
+              />
+            </section>
           </>
         )}
 
         {view === 'system' && (
-          <section className="panel">
-            <div className="panel-header"><h2>System</h2><p>Architecture and deployment status</p></div>
-            <div className="system-grid">
-              <div><strong>API</strong><span>http://localhost:3000</span></div>
-              <div><strong>Web</strong><span>http://localhost:5173</span></div>
-              <div><strong>Database</strong><span>PostgreSQL</span></div>
-              <div><strong>Auth</strong><span>JWT + department scope</span></div>
-              <div><strong>Audit</strong><span>Enabled</span></div>
-              <div><strong>Storage</strong><span>Signed local files</span></div>
-            </div>
-          </section>
+          <div className="stack">
+            {securityAlerts?.alerts.length ? <section className="security-alerts">{securityAlerts.alerts.map((alert) => <div className={`security-alert ${alert.severity}`} key={`${alert.code}-${alert.ipAddress ?? 'org'}`}><span className="alert-symbol">!</span><div><strong>{alert.title}</strong><p>{alert.detail}</p></div><small>{alert.code.replaceAll('_', ' ')}</small></div>)}</section> : <section className="callout"><span className="callout-icon">✓</span><div><b>No threshold alerts</b><p>Revocations and sensitive audit activity are within the current policy window.</p></div></section>}
+            <section className="metric-grid"><StatCard label="Audit events" value={complianceReport?.events ?? '—'} /><StatCard label="Active sessions" value={complianceReport?.sessions.active ?? '—'} /><StatCard label="Revoked sessions" value={complianceReport?.sessions.revoked ?? '—'} /><StatCard label="Sensitive events" value={securityAlerts?.summary.suspiciousEvents ?? '—'} /></section>
+            <section className="panel"><div className="panel-header"><div><h2>Compliance report</h2><p>Organization-wide audit and access posture for the last {securityAlerts?.windowHours ?? 24} hours.</p></div><div className="btn-group"><button className="secondary-sm" onClick={exportTenantPackage}>Export tenant package</button><span className="badge">Threshold monitoring active</span></div></div><div className="system-grid"><div><strong>API</strong><span>http://localhost:3000</span></div><div><strong>Database</strong><span>PostgreSQL</span></div><div><strong>Authentication</strong><span>JWT + revocable sessions</span></div><div><strong>Audit posture</strong><span>{complianceReport?.events ?? 0} recorded events</span></div><div><strong>Revocation threshold</strong><span>{securityAlerts?.thresholds.revokedSessions ?? 3} sessions / window</span></div><div><strong>Suspicious threshold</strong><span>{securityAlerts?.thresholds.suspiciousEvents ?? 5} events / window</span></div></div></section>
+            <section className="panel"><div className="panel-header"><h2>Top audited actions</h2><p>Most frequent governance events in the selected scope</p></div><DataTable columns={['Action', 'Events']} rows={(complianceReport?.byAction ?? []).slice(0, 8).map((item) => [item.action, item._count._all])} /></section>
+            <section className="panel"><div className="panel-header"><div><h2>Export history</h2><p>Queued tenant packages with durable progress and completion status.</p></div><span className="badge">{exportJobs.filter((job) => job.status === 'completed').length} completed</span></div><DataTable columns={['Created', 'Status', 'Progress', 'Records', 'Action']} rows={exportJobs.map((job) => [new Date(job.createdAt).toLocaleString(), job.status, `${job.progress}%`, job.recordCount, job.status === 'completed' ? <button className="secondary-sm" onClick={async () => { const result = await api<Record<string, unknown>>(`/exports/tenant/jobs/${job.id}/download`); const blob = new Blob([JSON.stringify(result, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = `tenant-export-${job.id}.json`; link.click(); URL.revokeObjectURL(url); }}>Download</button> : '-'])} /></section>
+          </div>
         )}
       </main>
     </div>

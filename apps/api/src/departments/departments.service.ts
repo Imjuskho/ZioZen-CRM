@@ -1,28 +1,40 @@
-import { Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { CreateDepartmentDto } from './dto/create-department.dto.js';
+import { ensureDepartmentAccess, getUserScope } from '../common/department-scope.js';
 
 @Injectable()
 export class DepartmentsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  findAll() {
-    return this.prisma.department.findMany({ orderBy: { name: 'asc' } });
+  async findAll(userId: string) {
+    const scope = await getUserScope(this.prisma, userId);
+    return this.prisma.department.findMany({ where: { id: { in: scope.departmentIds } }, orderBy: { name: 'asc' } });
   }
 
-  findOne(id: string) {
-    return this.prisma.department.findUnique({ where: { id } });
+  async findOne(userId: string, id: string) {
+    const scope = await getUserScope(this.prisma, userId);
+    ensureDepartmentAccess(scope.isAdmin, scope.departmentIds, id);
+    const department = await this.prisma.department.findUnique({ where: { id } });
+    if (!department) throw new NotFoundException('Department not found');
+    return department;
   }
 
-  create(dto: CreateDepartmentDto) {
-    return this.prisma.department.create({ data: dto });
+  async create(userId: string, dto: CreateDepartmentDto) {
+    const scope = await getUserScope(this.prisma, userId);
+    if (!scope.isAdmin) throw new ForbiddenException('Only organization administrators can create departments');
+    return this.prisma.department.create({ data: { ...dto, organizationId: scope.organizationId } });
   }
 
-  update(id: string, dto: Partial<CreateDepartmentDto>) {
+  async update(userId: string, id: string, dto: Partial<CreateDepartmentDto>) {
+    const scope = await getUserScope(this.prisma, userId);
+    ensureDepartmentAccess(scope.isAdmin, scope.departmentIds, id);
     return this.prisma.department.update({ where: { id }, data: dto });
   }
 
-  remove(id: string) {
+  async remove(userId: string, id: string) {
+    const scope = await getUserScope(this.prisma, userId);
+    ensureDepartmentAccess(scope.isAdmin, scope.departmentIds, id);
     return this.prisma.department.delete({ where: { id } });
   }
 }

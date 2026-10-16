@@ -11,9 +11,11 @@ import { ReportsService } from './reports.service.js';
 import { DataMigrationService } from './data-migration.service.js';
 import type { ExportScope } from './data-migration.service.js';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
+import { PermissionsGuard } from '../common/permissions.guard.js';
+import { Permissions } from '../common/permissions.decorator.js';
 
 @Controller('reports')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class ReportsController {
   constructor(
     private readonly reportsService: ReportsService,
@@ -34,6 +36,7 @@ export class ReportsController {
     });
   }
 
+  @Permissions('export.read')
   @Get('export')
   exportData(
     @Request() req: { user: { userId: string } },
@@ -43,6 +46,7 @@ export class ReportsController {
     return this.migrationService.exportData(req.user.userId, entity, departmentId);
   }
 
+  @Permissions('finance.import')
   @Post('import')
   importData(
     @Request() req: { user: { userId: string } },

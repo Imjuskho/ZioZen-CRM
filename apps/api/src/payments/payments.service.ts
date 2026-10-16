@@ -10,12 +10,14 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { getUserScope, ensureDepartmentAccess } from '../common/department-scope.js';
 import { CreatePaymentDto } from './dto/create-payment.dto.js';
+import { AccountingService } from '../accounting/accounting.service.js';
 
 @Injectable()
 export class PaymentsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly accounting: AccountingService,
   ) {}
 
   async list(userId: string, invoiceId: string) {
@@ -101,7 +103,8 @@ export class PaymentsService {
           newStatus,
           transactionId: dto.transactionId,
         },
-      });
+      }, tx);
+      await this.accounting.postPaymentReceived(tx, { paymentId: payment.id, invoiceNumber: invoice.number, amount: paymentAmount, currency: invoice.currency, departmentId: invoice.departmentId, actorId: userId });
 
       return {
         payment,

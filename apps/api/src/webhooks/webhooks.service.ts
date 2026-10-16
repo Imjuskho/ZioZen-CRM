@@ -12,12 +12,12 @@ export class WebhooksService {
   ) {}
 
   async findAll(userId: string) {
-    await getUserScope(this.prisma, userId);
-    return this.prisma.webhook.findMany({ orderBy: { createdAt: 'desc' } });
+    const scope = await getUserScope(this.prisma, userId);
+    return this.prisma.webhook.findMany({ where: scope.organizationId ? { owner: { organizationId: scope.organizationId } } : { ownerId: userId }, orderBy: { createdAt: 'desc' } });
   }
 
   async create(userId: string, dto: CreateWebhookDto) {
-    await getUserScope(this.prisma, userId);
+    const scope = await getUserScope(this.prisma, userId);
     const webhook = await this.prisma.webhook.create({
       data: {
         name: dto.name,
@@ -34,6 +34,7 @@ export class WebhooksService {
       entityType: 'Webhook',
       entityId: webhook.id,
       actorId: userId,
+      organizationId: scope.organizationId ?? undefined,
       metadata: { name: webhook.name, url: webhook.url, events: webhook.events },
     });
 

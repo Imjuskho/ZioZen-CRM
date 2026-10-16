@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "project": {
+    "name": "ziozen-crm",
+    "productType": null,
+    "stack": []
+  },
+  "sources": {
+    "tokens": [],
+    "components": [],
+    "assets": [],
+    "instructions": []
+  },
+  "design": {
+    "colorMode": "unknown",
+    "colors": {},
+    "typography": {},
+    "spacing": {},
+    "radius": {},
+    "shadows": {},
+    "motion": {},
+    "density": "unknown"
+  },
+  "components": {
+    "installed": [],
+    "preferredPrimitives": [],
+    "patterns": []
+  },
+  "constraints": {
+    "must": [],
+    "avoid": []
+  },
+  "decisions": [],
+  "evidence": [],
+  "generatedAt": "2026-10-13T15:13:36.088Z"
+}

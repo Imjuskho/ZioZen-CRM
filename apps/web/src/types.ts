@@ -23,6 +23,7 @@ export type Project = {
   status: string;
   departmentId: string;
   department?: Department;
+  customer?: Customer | null;
   createdAt: string;
 };
 
@@ -46,9 +47,24 @@ export type Invoice = {
   currency: string;
   departmentId: string;
   department?: Department;
+  customer?: Customer | null;
   payments?: Array<{ id: string; amount: string; method?: string | null; paymentDate: string }>;
   createdAt: string;
 };
+
+export type CreditNote = {
+  id: string;
+  number: string;
+  total: string;
+  currency: string;
+  status: string;
+  customer?: Customer | null;
+  appliedTotal: string;
+  availableTotal: string;
+};
+
+export type LedgerAccount = { id: string; code: string; name: string; type: string; currency: string; departmentId: string; active: boolean };
+export type JournalEntry = { id: string; number: string; date: string; memo?: string | null; departmentId: string; lines: Array<{ id: string; debit: string; credit: string; account: { code: string; name: string } }> };
 
 export type UserRecord = {
   id: string;
@@ -188,3 +204,54 @@ export type Webhook = {
   active: boolean;
   createdAt: string;
 };
+
+export type SignalEvidence = {
+  id: string;
+  sourceType: string;
+  sourceId: string;
+  metric: string;
+  observedValue: string;
+  expectedValue?: string | null;
+  capturedAt: string;
+};
+
+export type OperationalSignal = {
+  id: string;
+  type: string;
+  severity: string;
+  status: string;
+  title: string;
+  explanation: string;
+  entityType: string;
+  entityId: string;
+  customer?: { id: string; name: string } | null;
+  owner?: { id: string; firstName: string; lastName: string; email: string } | null;
+  dueAt?: string | null;
+  createdAt: string;
+  evidence: SignalEvidence[];
+};
+
+export type SignalRule = {
+  id: string;
+  type: string;
+  departmentId: string;
+  department: { id: string; name: string };
+  enabled: boolean;
+  thresholdHours?: number | null;
+  cooldownHours: number;
+  updatedAt: string;
+};
+
+export type SignalMetrics = {
+  byStatus: Record<string, number>;
+  actionCounts: Record<string, number>;
+  totalCreated: number;
+  totalClosed: number;
+  resolvedCount: number;
+  dismissedCount: number;
+  averageResolutionHours: number;
+  averageOpenAgeHours: number;
+};
+
+export type ProfitLossSummary = { departmentId: string; revenue: string; expenses: string; netProfit: string; rows: Array<{ accountId: string; code: string; name: string; type: string; balance: string }> };
+export type FinanceException = { id: string; type: string; severity: string; status: string; title: string; detail: string; entityType?: string | null; entityId?: string | null; assignee?: { firstName: string; lastName: string } | null };

@@ -36,6 +36,15 @@ import { DepartmentsModule } from './departments/departments.module.js';
 import { CustomersModule } from './customers/customers.module.js';
 import { ProjectsModule } from './projects/projects.module.js';
 import { TasksModule } from './tasks/tasks.module.js';
+import { CustomerPortalModule } from './customer-portal/customer-portal.module.js';
+import { SignalsModule } from './signals/signals.module.js';
+import { AccountingModule } from './accounting/accounting.module.js';
+import { PeopleModule } from './people/people.module.js';
+import { Wave5Module } from './wave5/wave5.module.js';
+import { PlanningModule } from './planning/planning.module.js';
+import { AccessModule } from './access/access.module.js';
+import { ExportsModule } from './exports/exports.module.js';
+import { OperationsModule } from './operations/operations.module.js';
 
 @Module({
   imports: [
@@ -47,6 +56,15 @@ import { TasksModule } from './tasks/tasks.module.js';
     CustomersModule,
     ProjectsModule,
     TasksModule,
+    CustomerPortalModule,
+    SignalsModule,
+    AccountingModule,
+    PeopleModule,
+    Wave5Module,
+    PlanningModule,
+    AccessModule,
+    ExportsModule,
+    OperationsModule,
     InvoicesModule,
     UsersModule,
     CustomerNotesModule,

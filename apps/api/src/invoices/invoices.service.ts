@@ -9,12 +9,14 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { CreateInvoiceDto } from './dto/create-invoice.dto.js';
 import { getUserScope, ensureDepartmentAccess } from '../common/department-scope.js';
+import { AccountingService } from '../accounting/accounting.service.js';
 
 @Injectable()
 export class InvoicesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly accounting: AccountingService,
   ) {}
 
   async findAll(userId: string) {
@@ -52,30 +54,32 @@ export class InvoicesService {
     const scope = await getUserScope(this.prisma, userId);
     ensureDepartmentAccess(scope.isAdmin, scope.departmentIds, dto.departmentId);
 
-    const invoice = await this.prisma.invoice.create({
-      data: {
-        number: dto.number,
-        amount: dto.amount,
-        departmentId: dto.departmentId,
-        customerId: dto.customerId,
-        status: dto.status ?? 'draft',
-        currency: dto.currency ?? 'USD',
-        notes: dto.notes,
-        ownerId: userId,
-      },
-      include: { department: true, customer: true, payments: true, items: true },
-    });
+    return this.prisma.$transaction(async (tx) => {
+      const invoice = await tx.invoice.create({
+        data: {
+          number: dto.number,
+          amount: dto.amount,
+          departmentId: dto.departmentId,
+          customerId: dto.customerId,
+          status: dto.status ?? 'draft',
+          currency: dto.currency ?? 'USD',
+          notes: dto.notes,
+          ownerId: userId,
+        },
+        include: { department: true, customer: true, payments: true, items: true },
+      });
 
-    await this.audit.log({
-      action: 'INVOICE_CREATED',
-      entityType: 'Invoice',
-      entityId: invoice.id,
-      departmentId: invoice.departmentId,
-      actorId: userId,
-      metadata: { number: invoice.number, amount: invoice.amount.toString() },
+      await this.audit.log({
+        action: 'INVOICE_CREATED',
+        entityType: 'Invoice',
+        entityId: invoice.id,
+        departmentId: invoice.departmentId,
+        actorId: userId,
+        metadata: { number: invoice.number, amount: invoice.amount.toString(), status: invoice.status },
+      }, tx);
+      if (invoice.status !== 'draft') await this.accounting.postInvoiceIssued(tx, { invoiceId: invoice.id, number: invoice.number, amount: invoice.amount, currency: invoice.currency, departmentId: invoice.departmentId, actorId: userId });
+      return invoice;
     });
-
-    return invoice;
   }
 
   async getHtml(userId: string, id: string) {

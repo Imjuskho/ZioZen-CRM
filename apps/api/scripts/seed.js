@@ -1,24 +1,33 @@
-const { PrismaClient } = require('@prisma/client');
+import { PrismaClient } from '@prisma/client';
+import bcrypt from 'bcrypt';
 const prisma = new PrismaClient();
 
 async function main() {
+  const password = 'seed-password-change-me';
+  const passwordHash = await bcrypt.hash(password, 12);
+  const organization = await prisma.organization.upsert({
+    where: { slug: 'ziozen-default' },
+    update: { name: 'ZioZen Default Organization' },
+    create: { name: 'ZioZen Default Organization', slug: 'ziozen-default' },
+  });
   const admin = await prisma.user.upsert({
     where: { email: 'admin@ziozen.test' },
-    update: { role: 'ADMIN', active: true },
+    update: { role: 'ADMIN', active: true, passwordHash, organizationId: organization.id },
     create: {
       email: 'admin@ziozen.test',
-      passwordHash: 'seed-password-change-me',
+      passwordHash,
       firstName: 'Zio',
       lastName: 'Zen',
       role: 'ADMIN',
       active: true,
+      organizationId: organization.id,
     },
   });
 
   const department = await prisma.department.upsert({
     where: { slug: 'studio' },
-    update: {},
-    create: { name: 'ZioZen Studio', slug: 'studio', description: 'Initial department' },
+    update: { organizationId: organization.id },
+    create: { name: 'ZioZen Studio', slug: 'studio', description: 'Initial department', organizationId: organization.id },
   });
 
   await prisma.userDepartment.upsert({

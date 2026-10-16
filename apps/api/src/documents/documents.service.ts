@@ -16,8 +16,9 @@ export class DocumentsService {
     ensureDepartmentAccess(scope.isAdmin, scope.departmentIds, invoice.departmentId);
 
     const branding = (invoice.department.branding as Record<string, string> | null) || {};
-    const color = branding.primaryColor || '#1d4ed8';
-    const logo = branding.logoUrl || '';
+    const esc = (value: unknown) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char] ?? char);
+    const color = esc(branding.primaryColor || '#1d4ed8').replace(/[^#a-zA-Z0-9(),.% -]/g, '');
+    const logo = esc(branding.logoUrl || '');
 
     return `<!doctype html>
 <html>
@@ -36,20 +37,20 @@ export class DocumentsService {
   <body>
     <div class="brand">
       ${logo ? `<img src="${logo}" alt="logo" height="48" />` : ''}
-      <h1>${invoice.department.name}</h1>
+      <h1>${esc(invoice.department.name)}</h1>
     </div>
-    <h2>Invoice ${invoice.number}</h2>
+    <h2>Invoice ${esc(invoice.number)}</h2>
     <div class="row">
       <div>
-        <strong>Customer:</strong> ${invoice.customer?.name ?? 'n/a'}<br />
-        <strong>Status:</strong> ${invoice.status}<br />
-        <strong>Currency:</strong> ${invoice.currency}
+        <strong>Customer:</strong> ${esc(invoice.customer?.name ?? 'n/a')}<br />
+        <strong>Status:</strong> ${esc(invoice.status)}<br />
+        <strong>Currency:</strong> ${esc(invoice.currency)}
       </div>
       <div>
-        <strong>Total:</strong> ${invoice.amount.toString()} ${invoice.currency}
+        <strong>Total:</strong> ${esc(invoice.amount.toString())} ${esc(invoice.currency)}
       </div>
     </div>
-    ${invoice.notes ? `<p>${invoice.notes}</p>` : ''}
+    ${invoice.notes ? `<p>${esc(invoice.notes)}</p>` : ''}
   </body>
 </html>`;
   }

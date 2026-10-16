@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Request, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Request, UseGuards } from '@nestjs/common';
 import { AuthService } from './auth.service.js';
 import { LoginDto } from './dto/login.dto.js';
 import { RegisterDto } from './dto/register.dto.js';
@@ -23,4 +23,16 @@ export class AuthController {
   me(@Request() req: { user: { userId: string } }) {
     return this.authService.me(req.user.userId);
   }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('sessions')
+  sessions(@Request() req: { user: { userId: string } }) { return this.authService.listSessions(req.user.userId); }
+
+  @UseGuards(JwtAuthGuard)
+  @Delete('sessions/:id')
+  revoke(@Request() req: { user: { userId: string } }, @Param('id') id: string) { return this.authService.revokeSession(req.user.userId, id); }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('sessions/revoke-all')
+  revokeAll(@Request() req: { user: { userId: string } }) { return this.authService.revokeAllSessions(req.user.userId); }
 }
